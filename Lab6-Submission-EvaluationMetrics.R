@@ -202,7 +202,7 @@ pima_indians_diabetes_test <- PimaIndiansDiabetes[-train_index, ]
 # We apply the 5-fold cross validation resampling method
 train_control <- trainControl(method = "cv", number = 5)
 
- # We then train a Generalized Linear Model to predict the value of Diabetes
+# We then train a Generalized Linear Model to predict the value of Diabetes
 # (whether the patient will test positive/negative for diabetes).
 
 # `set.seed()` is a function that is used to specify a starting point for the
