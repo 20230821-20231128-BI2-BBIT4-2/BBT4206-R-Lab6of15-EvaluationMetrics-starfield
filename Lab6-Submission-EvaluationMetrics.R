@@ -170,7 +170,7 @@ if (require("dplyr")) {
 # the distribution can be that Red are 70 instances and Blue are 30 instances.
 
 ## 1.a. Load the dataset ----
-data(PimaIndiansDiabetes)
+data(iris)
 ## 1.b. Determine the Baseline Accuracy ----
 # Identify the number of instances that belong to each class (distribution or
 # class breakdown).
@@ -182,21 +182,21 @@ data(PimaIndiansDiabetes)
 # predicting that all instances belong to the class "negative".
 
 # This in turn implies that the baseline accuracy is 65%.
-
-pima_indians_diabetes_freq <- PimaIndiansDiabetes$diabetes
+View(iris)
+iris_freq <- iris$Species
 cbind(frequency =
-        table(pima_indians_diabetes_freq),
-      percentage = prop.table(table(pima_indians_diabetes_freq)) * 100)
+        table(iris_freq),
+      percentage = prop.table(table(iris_freq)) * 100)
 
 ## 1.c. Split the dataset ----
 # Define a 75:25 train:test data split of the dataset.
 # That is, 75% of the original data will be used to train the model and
 # 25% of the original data will be used to test the model.
-train_index <- createDataPartition(PimaIndiansDiabetes$diabetes,
+train_index <- createDataPartition(iris$Species,
                                    p = 0.75,
                                    list = FALSE)
-pima_indians_diabetes_train <- PimaIndiansDiabetes[train_index, ]
-pima_indians_diabetes_test <- PimaIndiansDiabetes[-train_index, ]
+iris_train <- iris[train_index, ]
+iris_test <- iris[-train_index, ]
 
 ## 1.d. Train the Model ----
 # We apply the 5-fold cross validation resampling method
@@ -209,15 +209,15 @@ train_control <- trainControl(method = "cv", number = 5)
 # random number generator to a specific value. This ensures that every time you
 # run the same code, you will get the same "random" numbers.
 set.seed(7)
-diabetes_model_glm <-
-  train(diabetes ~ ., data = pima_indians_diabetes_train, method = "glm",
+iris_model_rf  <-
+  train(Species ~ ., data = iris_train, method = "rf",
         metric = "Accuracy", trControl = train_control)
 
 ## 1.e. Display the Model's Performance ----
 ### Option 1: Use the metric calculated by caret when training the model ----
 # The results show an accuracy of approximately 77% (slightly above the baseline
 # accuracy) and a Kappa of approximately 49%.
-print(diabetes_model_glm)
+print(iris_model_rf)
 
 ### Option 2: Compute the metric yourself using the test dataset ----
 # A confusion matrix is useful for multi-class classification problems.
@@ -228,17 +228,27 @@ print(diabetes_model_glm)
 # confusion matrix represent predicted values and column headers are used to
 # represent actual values.
 
-predictions <- predict(diabetes_model_glm, pima_indians_diabetes_test[, 1:8])
-confusion_matrix <-
-  caret::confusionMatrix(predictions,
-                         pima_indians_diabetes_test[, 1:9]$diabetes)
+predictions <- predict(iris_model_rf, newdata = iris_test[, 1:4])
+
+# Make sure both 'predictions' and 'iris_test[, 1:4]$Species' are factors
+predictions <- as.factor(predictions)
+# Convert the "Species" column to a factor in the full data frame
+iris_test$Species <- as.factor(iris_test$Species)
+
+# Set factor levels for 'predictions' and 'iris_test[, 1:4]$Species'
+confusion_matrix <- confusionMatrix(predictions, iris_test$Species)
 print(confusion_matrix)
 
-### Option 3: Display a graphical confusion matrix ----
+confusion_data <- as.data.frame(as.table(confusion_matrix))
 
-# Visualizing Confusion Matrix
-fourfoldplot(as.table(confusion_matrix), color = c("grey", "lightblue"),
-             main = "Confusion Matrix")
+### Option 3: Display a graphical confusion matrix ----
+ggplot(data = confusion_data, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "lightblue", high = "blue") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix")
+
 
 # 2. RMSE, R Squared, and MAE ----
 
@@ -253,9 +263,7 @@ fourfoldplot(as.table(confusion_matrix), color = c("grey", "lightblue"),
 # 0 refers to "no fit" and 1 refers to a "perfect fit".
 
 ## 2.a. Load the dataset ----
-data(longley)
-summary(longley)
-longley_no_na <- na.omit(longley)
+data(PimaIndiansDiabetes)
 
 ## 2.b. Split the dataset ----
 # Define a train:test data split of the dataset. Such that 10/16 are in the
@@ -266,13 +274,13 @@ longley_no_na <- na.omit(longley)
 
 # For reproducibility; by ensuring that you end up with the same
 # "random" samples
-set.seed(7)
 
 # We apply simple random sampling using the base::sample function to get
 # 10 samples
-train_index <- sample(1:dim(longley)[1], 10) # nolint: seq_linter.
-longley_train <- longley[train_index, ]
-longley_test <- longley[-train_index, ]
+set.seed(7)
+train_index <- sample(1:nrow(PimaIndiansDiabetes), 10)
+Pima_train <- PimaIndiansDiabetes[train_index, ]
+Pima_test <- PimaIndiansDiabetes[-train_index, ]
 
 ## 2.c. Train the Model ----
 # We apply bootstrapping with 1,000 repetitions
@@ -280,9 +288,10 @@ train_control <- trainControl(method = "boot", number = 1000)
 
 # We then train a linear regression model to predict the value of Employed
 # (the number of people that will be employed given the independent variables).
-longley_model_lm <-
-  train(Employed ~ ., data = longley_train,
-        na.action = na.omit, method = "lm", metric = "RMSE",
+Pima_model_logistic <-
+  train(diabetes ~ ., data = Pima_train,
+        method = "glm", family = binomial,
+        metric = "MSE",  
         trControl = train_control)
 
 ## 2.d. Display the Model's Performance ----
@@ -290,34 +299,17 @@ longley_model_lm <-
 # The results show an RMSE value of approximately 4.3898 and
 # an R Squared value of approximately 0.8594
 # (the closer the R squared value is to 1, the better the model).
-print(longley_model_lm)
-
+print(Pima_model_logistic)
 ### Option 2: Compute the metric yourself using the test dataset ----
-predictions <- predict(longley_model_lm, longley_test[, 1:6])
-
+predictions <- predict(Pima_model_logistic, Pima_test)
 # These are the 6 values for employment that the model has predicted:
 print(predictions)
 
-#### RMSE ----
-rmse <- sqrt(mean((longley_test$Employed - predictions)^2))
-print(paste("RMSE =", rmse))
-
-#### SSR ----
-# SSR is the sum of squared residuals (the sum of squared differences
-# between observed and predicted values)
-ssr <- sum((longley_test$Employed - predictions)^2)
-print(paste("SSR =", ssr))
-
-#### SST ----
-# SST is the total sum of squares (the sum of squared differences
-# between observed values and their mean)
-sst <- sum((longley_test$Employed - mean(longley_test$Employed))^2)
-print(paste("SST =", sst))
-
-#### R Squared ----
-# We then use SSR and SST to compute the value of R squared
-r_squared <- 1 - (ssr / sst)
-print(paste("R Squared =", r_squared))
+# Calculate the mean squared error (MSE)
+mse <- mean((as.numeric(predictions) - as.numeric(Pima_test$diabetes))^2)
+# Calculate RMSE by taking the square root of MSE
+rmse <- sqrt(mse)
+print(paste("RMSE (MSE) =", rmse))
 
 #### MAE ----
 # MAE measures the average absolute differences between the predicted and
@@ -328,9 +320,6 @@ print(paste("R Squared =", r_squared))
 # interpret. For example, if you are predicting the amount paid in rent,
 # and the MAE is KES. 10,000, it means, on average, your model's predictions
 # are off by about KES. 10,000.
-absolute_errors <- abs(predictions - longley_test$Employed)
-mae <- mean(absolute_errors)
-print(paste("MAE =", mae))
 
 # 3. Area Under ROC Curve ----
 # Area Under Receiver Operating Characteristic Curve (AUROC) or simply
@@ -352,36 +341,33 @@ print(paste("MAE =", mae))
 #         rate.
 
 ## 3.a. Load the dataset ----
-data(PimaIndiansDiabetes)
+data(iris)
 ## 3.b. Determine the Baseline Accuracy ----
 # The baseline accuracy is 65%.
+iris_species_freq <- iris$Species
+cbind(frequency = table(iris_species_freq), 
+      percentage = prop.table(table(iris_species_freq)) * 100)
 
-pima_indians_diabetes_freq <- PimaIndiansDiabetes$diabetes
-cbind(frequency =
-        table(pima_indians_diabetes_freq),
-      percentage = prop.table(table(pima_indians_diabetes_freq)) * 100)
 
 ## 3.c. Split the dataset ----
 # Define an 80:20 train:test data split of the dataset.
-train_index <- createDataPartition(PimaIndiansDiabetes$diabetes,
+set.seed(7)
+train_index <- createDataPartition(iris$Species,
                                    p = 0.8,
                                    list = FALSE)
-pima_indians_diabetes_train <- PimaIndiansDiabetes[train_index, ]
-pima_indians_diabetes_test <- PimaIndiansDiabetes[-train_index, ]
+iris_train <- iris[train_index, ]
+iris_test <- iris[-train_index, ]
 
 ## 3.d. Train the Model ----
 # We apply the 10-fold cross validation resampling method
-train_control <- trainControl(method = "cv", number = 10,
-                              classProbs = TRUE,
-                              summaryFunction = twoClassSummary)
+train_control <- trainControl(method = "cv", number = 10, classProbs = TRUE)
+
 
 # We then train a k Nearest Neighbours Model to predict the value of Diabetes
 # (whether the patient will test positive/negative for diabetes).
+iris_model_knn <- train(Species ~ ., data = iris_train, method = "knn",
+                        metric = "Accuracy", trControl = train_control)
 
-set.seed(7)
-diabetes_model_knn <-
-  train(diabetes ~ ., data = pima_indians_diabetes_train, method = "knn",
-        metric = "ROC", trControl = train_control)
 
 ## 3.e. Display the Model's Performance ----
 ### Option 1: Use the metric calculated by caret when training the model ----
@@ -389,26 +375,25 @@ diabetes_model_knn <-
 # the higher the prediction accuracy) when the parameter k = 9
 # (9 nearest neighbours).
 
-print(diabetes_model_knn)
+print(iris_model_knn)
 
 ### Option 2: Compute the metric yourself using the test dataset ----
 #### Sensitivity and Specificity ----
-predictions <- predict(diabetes_model_knn, pima_indians_diabetes_test[, 1:8])
+predictions <- predict(iris_model_knn, iris_test)
 # These are the values for diabetes that the
 # model has predicted:
 print(predictions)
 confusion_matrix <-
   caret::confusionMatrix(predictions,
-                         pima_indians_diabetes_test[, 1:9]$diabetes)
-
+                         iris_test$Species)
 # We can see the sensitivity (≈ 0.86) and the specificity (≈ 0.60) below:
 print(confusion_matrix)
 
 #### AUC ----
 # The type = "prob" argument specifies that you want to obtain class
 # probabilities as the output of the prediction instead of class labels.
-predictions <- predict(diabetes_model_knn, pima_indians_diabetes_test[, 1:8],
-                       type = "prob")
+predictions <- predict(iris_model_knn, iris_test, type = "prob")
+
 
 # These are the class probability values for diabetes that the
 # model has predicted:
@@ -423,12 +408,20 @@ print(predictions)
 # Setting the Direction: The phrase "Setting direction: controls < cases"
 # specifies how you define which class is considered the positive class (cases)
 # and which is considered the negative class (controls) when calculating
-# sensitivity and specificity.
-roc_curve <- roc(pima_indians_diabetes_test$diabetes, predictions$neg)
+# Compute the ROC curves for each class
+roc_curves <- lapply(unique(iris$Species), function(class_name) {
+  class_predictions <- as.numeric(predictions[class_name] > 0)
+  class_roc <- roc(iris_test$Species == class_name, class_predictions)
+  return(class_roc)
+})
 
-# Plot the ROC curve
-plot(roc_curve, main = "ROC Curve for KNN Model", print.auc = TRUE,
-     print.auc.x = 0.6, print.auc.y = 0.6, col = "blue", lwd = 2.5)
+# Plot the ROC curves for each class
+colors <- rainbow(length(roc_curves))
+for (i in 1:length(roc_curves)) {
+  plot(roc_curves[[i]], col = colors[i], print.auc = TRUE, print.auc.x = 0.6, print.auc.y = 0.6, lwd = 2.5, add = (i > 1))
+}
+
+legend("bottomright", legend = unique(iris$Species), col = colors, lwd = 2.5)
 
 # 4. Logarithmic Loss (LogLoss) ----
 # Logarithmic Loss (LogLoss) is an evaluation metric commonly used for
@@ -454,7 +447,7 @@ plot(roc_curve, main = "ROC Curve for KNN Model", print.auc = TRUE,
 
 ########################### ----
 ## 4.a. Load the dataset ----
-data(iris)
+data(PimaIndiansDiabetes)
 
 ## 4.b. Train the Model ----
 # We apply the 5-fold repeated cross validation resampling method
@@ -463,17 +456,18 @@ train_control <- trainControl(method = "repeatedcv", number = 5, repeats = 3,
                               classProbs = TRUE,
                               summaryFunction = mnLogLoss)
 set.seed(7)
+
 # This creates a CART model. One of the parameters used by a CART model is "cp".
 # "cp" refers to the "complexity parameter". It is used to impose a penalty to
 # the tree for having too many splits. The default value is 0.01.
-iris_model_cart <- train(Species ~ ., data = iris, method = "rpart",
+pima_model_cart <- train(diabetes ~ ., data = PimaIndiansDiabetes, method = "rpart",
                          metric = "logLoss", trControl = train_control)
 
 ## 4.c. Display the Model's Performance ----
 ### Option 1: Use the metric calculated by caret when training the model ----
 # The results show that a cp value of ≈ 0 resulted in the lowest
 # LogLoss value. The lowest logLoss value is ≈ 0.46.
-print(iris_model_cart)
+print(pima_model_cart)
 
 # [OPTIONAL] **Deinitialization: Create a snapshot of the R environment ----
 # Lastly, as a follow-up to the initialization step, record the packages
